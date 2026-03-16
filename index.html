@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>모닝 날씨 알리미</title>
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#7aaecc"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="날씨알리미"/>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Black+Han+Sans&display=swap" rel="stylesheet"/>
+  <style>
+    html { overflow-x: hidden; width: 100%; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --dark: #1a2a3a; --text: #2c3e50;
+      --card: rgba(255,255,255,0.72); --border: rgba(255,255,255,0.9);
+      --shadow: 0 8px 32px rgba(100,150,200,0.18);
+    }
+
+    body {
+      font-family: 'Gowun Dodum', sans-serif;
+      min-height: 100vh; width: 100%; max-width: 100vw;
+      background: linear-gradient(160deg, #c9e8ff 0%, #fde8c8 60%, #fff5e0 100%);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 32px 16px 48px; color: var(--text);
+      position: relative; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; top: -10vh; left: -10vw;
+      width: 60vw; height: 60vw; max-width: 400px; max-height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(180,220,255,0.45) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    body::after {
+      content: ''; position: fixed; bottom: -10vh; right: -10vw;
+      width: 55vw; height: 55vw; max-width: 360px; max-height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(253,200,140,0.35) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    header { text-align: center; margin-bottom: 32px; animation: fadeDown 0.7s ease both; }
+    header .emoji { font-size: 3rem; display: block; margin-bottom: 4px; }
+    header h1 { font-family: 'Black Han Sans', sans-serif; font-size: 2rem; color: var(--dark); letter-spacing: -1px; }
+    header p { font-size: 0.95rem; color: #607080; margin-top: 6px; }
+
+    .card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: 24px; box-shadow: var(--shadow);
+      padding: 20px 16px; width: 100%; max-width: 480px;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      margin-bottom: 20px; animation: fadeUp 0.6s ease both;
+    }
+    .card-title {
+      font-family: 'Black Han Sans', sans-serif; font-size: 1rem;
+      color: #7aaecc; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px;
+    }
+
+    .input-row { display: flex; gap: 8px; align-items: center; width: 100%; }
+    input[type="text"], input[type="time"] {
+      flex: 1; min-width: 0; padding: 12px 10px;
+      border: 1.5px solid #c9dff0; border-radius: 12px;
+      font-family: 'Gowun Dodum', sans-serif; font-size: 0.95rem;
+      background: rgba(255,255,255,0.85); color: var(--text);
+      outline: none; transition: border 0.2s;
+    }
+    input:focus { border-color: #7aaecc; }
+
+    .btn {
+      padding: 12px 14px; white-space: nowrap; flex-shrink: 0;
+      border: none; border-radius: 12px;
+      font-family: 'Black Han Sans', sans-serif; font-size: 0.85rem;
+      cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: linear-gradient(135deg, #7aaecc, #5592b8); color: #fff; box-shadow: 0 4px 14px rgba(90,150,200,0.3); }
+    .btn-primary:hover { box-shadow: 0 6px 20px rgba(90,150,200,0.45); }
+    .btn-success {
+      background: linear-gradient(135deg, #6dbe8f, #48a06a); color: #fff;
+      width: 100%; margin-top: 14px; padding: 14px; font-size: 1rem;
+      box-shadow: 0 4px 14px rgba(80,180,120,0.3);
+    }
+
+    .city-row { display: flex; gap: 8px; margin-bottom: 10px; width: 100%; }
+    .city-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(122,174,204,0.15); border: 1px solid #b0d4ec;
+      border-radius: 20px; padding: 6px 14px; font-size: 0.88rem; cursor: pointer;
+    }
+    .city-tag .remove { color: #c07; font-weight: bold; font-size: 1rem; line-height: 1; }
+
+    .time-row { display: flex; gap: 8px; align-items: center; width: 100%; }
+
+    #weather-preview { display: none; animation: fadeUp 0.5s ease both; }
+    .weather-main { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+    .weather-icon { font-size: 4rem; line-height: 1; }
+    .weather-temp { font-family: 'Black Han Sans', sans-serif; font-size: 3.2rem; color: var(--dark); line-height: 1; }
+    .weather-desc { font-size: 1rem; color: #607080; margin-top: 4px; }
+    .weather-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+    .weather-item { background: rgba(122,174,204,0.1); border-radius: 14px; padding: 14px 16px; }
+    .weather-item .label { font-size: 0.78rem; color: #8099aa; margin-bottom: 4px; }
+    .weather-item .value { font-family: 'Black Han Sans', sans-serif; font-size: 1.2rem; color: var(--dark); }
+    .outfit-box {
+      background: linear-gradient(120deg, rgba(253,230,180,0.5), rgba(200,230,255,0.5));
+      border-radius: 16px; padding: 16px 20px; border: 1px solid rgba(200,180,120,0.3);
+    }
+    .outfit-box .outfit-title { font-family: 'Black Han Sans', sans-serif; font-size: 0.85rem; color: #b0860a; letter-spacing: 2px; margin-bottom: 8px; }
+    .outfit-box .outfit-text { font-size: 1rem; line-height: 1.6; color: #3a3020; }
+
+    .notif-status { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 14px; font-size: 0.92rem; margin-bottom: 10px; }
+    .notif-status.on  { background: rgba(100,200,130,0.15); border: 1px solid #90daa0; color: #2a6a40; }
+    .notif-status.off { background: rgba(200,100,100,0.1);  border: 1px solid #e0aaaa; color: #7a2a2a; }
+    .notif-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .notif-dot.on  { background: #4caf6a; box-shadow: 0 0 6px #4caf6a; }
+    .notif-dot.off { background: #e07070; }
+
+    /* PWA 설치 배너 */
+    #install-banner {
+      display: none; width: 100%; max-width: 480px;
+      background: linear-gradient(135deg, #5592b8, #3a7aa0);
+      color: #fff; border-radius: 16px; padding: 16px 20px;
+      margin-bottom: 20px; gap: 12px; align-items: center;
+      box-shadow: 0 4px 20px rgba(60,120,180,0.3);
+      animation: fadeUp 0.5s ease both;
+    }
+    #install-banner .install-text { flex: 1; font-size: 0.9rem; line-height: 1.5; }
+    #install-banner .install-text strong { font-family: 'Black Han Sans', sans-serif; display: block; font-size: 1rem; margin-bottom: 2px; }
+    #install-btn { background: #fff; color: #3a7aa0; border: none; border-radius: 10px; padding: 10px 16px; font-family: 'Black Han Sans', sans-serif; font-size: 0.85rem; cursor: pointer; flex-shrink: 0; }
+
+    .schedule-list { margin-top: 10px; }
+    .schedule-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; background: rgba(122,174,204,0.1);
+      border-radius: 10px; margin-bottom: 8px; font-size: 0.9rem;
+    }
+    .schedule-item .del-btn { background: none; border: none; cursor: pointer; color: #c07070; font-size: 1.1rem; padding: 2px 6px; }
+
+    .status-msg { text-align: center; font-size: 0.88rem; color: #7a9aaa; margin-top: 8px; min-height: 20px; }
+    .status-msg.error { color: #c07070; }
+    .status-msg.success { color: #4a9a60; }
+
+    .steps { max-width: 480px; width: 100%; margin-top: 4px; padding: 0; animation: fadeUp 0.8s ease 0.2s both; }
+    .step { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #7aaecc, #5592b8); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Black Han Sans', sans-serif; font-size: 0.85rem; flex-shrink: 0; margin-top: 1px;
+    }
+    .step-text { font-size: 0.88rem; color: #607080; line-height: 1.5; }
+    .step-text a { color: #5592b8; text-decoration: none; }
+
+    @keyframes fadeDown { from { opacity:0; transform:translateY(-20px); } to { opacity:1; transform:none; } }
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(20px);  } to { opacity:1; transform:none; } }
+  </style>
+</head>
+<body>
+
+<!-- PWA 설치 배너 -->
+<div id="install-banner">
+  <div class="install-text">
+    <strong>📱 홈 화면에 앱 추가</strong>
+    설치하면 백그라운드 알림을 받을 수 있어요!
+  </div>
+  <button id="install-btn" onclick="installPWA()">설치하기</button>
+</div>
+
+<header>
+  <span class="emoji">🌤️</span>
+  <h1>모닝 날씨 알리미</h1>
+  <p>매일 아침, 날씨와 추천 옷차림을 알려드려요</p>
+</header>
+
+<div class="card" style="animation-delay:0.05s">
+  <div class="card-title">① API 키 설정</div>
+  <div class="input-row">
+    <input type="text" id="api-key-input" placeholder="OpenWeatherMap API 키 입력" />
+    <button class="btn btn-primary" onclick="saveApiKey()">저장</button>
+  </div>
+  <div class="status-msg" id="api-status"></div>
+</div>
+
+<div class="card" style="animation-delay:0.1s">
+  <div class="card-title">② 도시 설정</div>
+  <div class="city-row">
+    <input type="text" id="city-input" placeholder="도시 이름 (예: Seoul, Busan)" style="flex:1"/>
+    <button class="btn btn-primary" onclick="addCity()">추가</button>
+  </div>
+  <div id="city-tags"></div>
+  <div class="status-msg" id="city-status"></div>
+</div>
+
+<div class="card" style="animation-delay:0.15s">
+  <div class="card-title">③ 현재 날씨 미리보기</div>
+  <button class="btn btn-primary" style="width:100%" onclick="fetchWeather()">날씨 불러오기 🌡️</button>
+  <div id="weather-preview" style="margin-top:20px">
+    <div class="weather-main">
+      <div class="weather-icon" id="w-icon">☀️</div>
+      <div>
+        <div class="weather-temp" id="w-temp">--°C</div>
+        <div class="weather-desc" id="w-desc">--</div>
+        <div style="font-size:0.82rem;color:#8099aa;margin-top:2px" id="w-city">--</div>
+      </div>
+    </div>
+    <div class="weather-grid">
+      <div class="weather-item"><div class="label">🌡 체감온도</div><div class="value" id="w-feels">--</div></div>
+      <div class="weather-item"><div class="label">💧 습도</div><div class="value" id="w-humidity">--</div></div>
+      <div class="weather-item"><div class="label">💨 미세먼지 PM2.5</div><div class="value" id="w-pm25">--</div></div>
+      <div class="weather-item"><div class="label">🌬 초미세먼지 PM10</div><div class="value" id="w-pm10">--</div></div>
+    </div>
+    <div class="outfit-box">
+      <div class="outfit-title">✨ 오늘의 추천 옷차림</div>
+      <div class="outfit-text" id="w-outfit">--</div>
+    </div>
+  </div>
+  <div class="status-msg" id="weather-status"></div>
+</div>
+
+<div class="card" style="animation-delay:0.2s">
+  <div class="card-title">④ 알림 설정</div>
+  <div id="notif-status-box" class="notif-status off">
+    <div class="notif-dot off" id="notif-dot"></div>
+    <span id="notif-text">브라우저 알림 권한이 필요해요</span>
+  </div>
+  <div class="time-row">
+    <input type="time" id="alarm-time" value="07:30" style="flex:1"/>
+    <button class="btn btn-primary" onclick="addSchedule()">알림 추가</button>
+  </div>
+  <div class="schedule-list" id="schedule-list"></div>
+  <button class="btn btn-success" onclick="requestNotifPermission()">🔔 알림 권한 허용 + Service Worker 등록</button>
+  <div class="status-msg" id="notif-status-msg"></div>
+</div>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">?</div>
+    <div class="step-text">
+      API 키가 없으신가요? <a href="https://openweathermap.org/api" target="_blank">openweathermap.org</a>에서 무료 가입 후 API Keys 메뉴에서 발급받으세요.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">!</div>
+    <div class="step-text">
+      백그라운드 알림을 받으려면 <strong>홈 화면에 앱 추가(설치)</strong> 후 사용하세요. 안드로이드 크롬/삼성브라우저에서 가장 잘 동작해요.
+    </div>
+  </div>
+</div>
+
+<script>
+  let apiKey   = localStorage.getItem('owm_api_key') || '';
+  let cities   = JSON.parse(localStorage.getItem('owm_cities') || '["Seoul"]');
+  let schedules= JSON.parse(localStorage.getItem('owm_schedules') || '[]');
+  let swReg    = null;
+  let deferredPrompt = null;
+
+  // ── PWA 설치 프롬프트 ─────────────────────────────────
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-banner').style.display = 'flex';
+  });
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('install-banner').style.display = 'none';
+    deferredPrompt = null;
+  });
+  async function installPWA() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  }
+
+  // ── Service Worker 등록 ───────────────────────────────
+  async function registerSW() {
+    if (!('serviceWorker' in navigator)) return null;
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      swReg = reg;
+      return reg;
+    } catch(e) {
+      console.warn('SW 등록 실패:', e);
+      return null;
+    }
+  }
+
+  // ── 알람을 SW에 전달 ──────────────────────────────────
+  async function syncSchedulesToSW() {
+    const reg = swReg || await registerSW();
+    if (!reg || !reg.active) return;
+    // 기존 알람 취소
+    reg.active.postMessage({ type: 'CANCEL_ALARMS' });
+    // 새 알람 등록
+    schedules.forEach(t => {
+      reg.active.postMessage({
+        type: 'SCHEDULE_ALARM',
+        timeStr: t,
+        apiKey,
+        city: cities[0] || 'Seoul'
+      });
+    });
+  }
+
+  // ── Init ──────────────────────────────────────────────
+  window.onload = async () => {
+    if (apiKey) {
+      document.getElementById('api-key-input').value = apiKey;
+      setStatus('api-status', '✅ 저장된 API 키 로드됨', 'success');
+    }
+    renderCities();
+    renderSchedules();
+    checkNotifPermission();
+    await registerSW();
+    if (Notification.permission === 'granted') syncSchedulesToSW();
+  };
+
+  // ── API Key ───────────────────────────────────────────
+  function saveApiKey() {
+    const v = document.getElementById('api-key-input').value.trim();
+    if (!v) return setStatus('api-status', '❌ API 키를 입력해주세요', 'error');
+    apiKey = v;
+    localStorage.setItem('owm_api_key', v);
+    setStatus('api-status', '✅ API 키 저장 완료!', 'success');
+    if (Notification.permission === 'granted') syncSchedulesToSW();
+  }
+
+  // ── Cities ────────────────────────────────────────────
+  function addCity() {
+    const v = document.getElementById('city-input').value.trim();
+    if (!v) return setStatus('city-status','❌ 도시 이름을 입력해주세요','error');
+    if (cities.includes(v)) return setStatus('city-status','이미 추가된 도시예요','error');
+    cities.push(v);
+    localStorage.setItem('owm_cities', JSON.stringify(cities));
+    document.getElementById('city-input').value = '';
+    renderCities();
+    setStatus('city-status', `✅ "${v}" 추가됨`, 'success');
+    if (Notification.permission === 'granted') syncSchedulesToSW();
+  }
+  function removeCity(c) {
+    cities = cities.filter(x => x !== c);
+    localStorage.setItem('owm_cities', JSON.stringify(cities));
+    renderCities();
+  }
+  function renderCities() {
+    document.getElementById('city-tags').innerHTML = cities.map(c => `
+      <span class="city-tag">📍 ${c}<span class="remove" onclick="removeCity('${c}')">×</span></span>
+    `).join(' ');
+  }
+
+  // ── Weather ───────────────────────────────────────────
+  async function fetchWeather(silent = false) {
+    if (!apiKey) { if (!silent) setStatus('weather-status','❌ API 키를 먼저 저장해주세요','error'); return null; }
+    if (!cities.length) { if (!silent) setStatus('weather-status','❌ 도시를 먼저 추가해주세요','error'); return null; }
+    const city = cities[0];
+    if (!silent) setStatus('weather-status','⏳ 날씨 불러오는 중...','');
+    try {
+      const wRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${apiKey}&units=metric&lang=kr`);
+      if (!wRes.ok) { const e = await wRes.json().catch(()=>({})); throw new Error(e.message||`오류 ${wRes.status}`); }
+      const w = await wRes.json();
+      const {lat,lon} = w.coord;
+      const aRes = await fetch(`https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${apiKey}`);
+      const a = aRes.ok ? await aRes.json() : null;
+      const pm25 = a?.list?.[0]?.components?.pm2_5 ?? null;
+      const pm10 = a?.list?.[0]?.components?.pm10  ?? null;
+      const data = { city:w.name, temp:Math.round(w.main.temp), feels:Math.round(w.main.feels_like), humidity:w.main.humidity, desc:w.weather[0].description, icon:weatherEmoji(w.weather[0].id), pm25, pm10, outfit:getOutfit(w.main.temp,pm25) };
+      if (!silent) { renderWeather(data); setStatus('weather-status','✅ 날씨 로드 완료','success'); }
+      return data;
+    } catch(e) { if (!silent) setStatus('weather-status',`❌ ${e.message}`,'error'); return null; }
+  }
+
+  function renderWeather(d) {
+    document.getElementById('w-icon').textContent    = d.icon;
+    document.getElementById('w-temp').textContent    = `${d.temp}°C`;
+    document.getElementById('w-desc').textContent    = d.desc;
+    document.getElementById('w-city').textContent    = `📍 ${d.city}`;
+    document.getElementById('w-feels').textContent   = `${d.feels}°C`;
+    document.getElementById('w-humidity').textContent= `${d.humidity}%`;
+    document.getElementById('w-pm25').textContent    = d.pm25!==null?`${d.pm25.toFixed(1)} µg/m³ ${pmGrade(d.pm25,'25')}`:'정보 없음';
+    document.getElementById('w-pm10').textContent    = d.pm10!==null?`${d.pm10.toFixed(1)} µg/m³ ${pmGrade(d.pm10,'10')}`:'정보 없음';
+    document.getElementById('w-outfit').innerHTML    = d.outfit;
+    document.getElementById('weather-preview').style.display = 'block';
+  }
+
+  function getOutfit(temp, pm25) {
+    let c='';
+    if(temp>=28)c='🩳 반팔·반바지·원피스 — 통풍 좋은 소재 추천';
+    else if(temp>=23)c='👕 반팔 티셔츠·얇은 면 소재';
+    else if(temp>=17)c='👔 긴팔 셔츠·가벼운 가디건';
+    else if(temp>=12)c='🧥 자켓·청재킷·후드티';
+    else if(temp>=6)c='🧣 코트·두꺼운 니트·머플러';
+    else c='🧤 패딩·방한 장갑·핫팩 준비';
+    let m='';
+    if(pm25===null)m='';
+    else if(pm25>=75)m='<br>😷 <strong>미세먼지 매우 나쁨</strong> — KF94 필수, 외출 자제';
+    else if(pm25>=35)m='<br>😷 <strong>미세먼지 나쁨</strong> — 마스크 착용 추천';
+    else if(pm25>=15)m='<br>🙂 미세먼지 보통 — 민감한 분은 마스크 챙기세요';
+    else m='<br>😊 미세먼지 좋음 — 쾌적한 날씨예요';
+    return c+m;
+  }
+  function pmGrade(val,type){
+    if(type==='25'){if(val<15)return'😊좋음';if(val<35)return'🙂보통';if(val<75)return'😟나쁨';return'😷매우나쁨';}
+    else{if(val<30)return'😊좋음';if(val<80)return'🙂보통';if(val<150)return'😟나쁨';return'😷매우나쁨';}
+  }
+  function weatherEmoji(id){
+    if(id>=200&&id<300)return'⛈️';if(id>=300&&id<400)return'🌦️';if(id>=500&&id<600)return'🌧️';
+    if(id>=600&&id<700)return'❄️';if(id>=700&&id<800)return'🌫️';if(id===800)return'☀️';
+    if(id===801)return'🌤️';if(id===802)return'⛅';return'☁️';
+  }
+
+  // ── Notifications ─────────────────────────────────────
+  async function requestNotifPermission() {
+    if (!('Notification' in window)) return setStatus('notif-status-msg','❌ 이 브라우저는 알림 미지원','error');
+    const perm = await Notification.requestPermission();
+    checkNotifPermission();
+    if (perm === 'granted') {
+      setStatus('notif-status-msg','✅ 알림 권한 허용! Service Worker 등록 중...','success');
+      await registerSW();
+      syncSchedulesToSW();
+      setStatus('notif-status-msg','✅ 백그라운드 알림 설정 완료!','success');
+    } else {
+      setStatus('notif-status-msg','❌ 알림 권한이 거부되었어요. 브라우저 설정에서 변경해주세요.','error');
+    }
+  }
+  function checkNotifPermission() {
+    const granted = 'Notification' in window && Notification.permission === 'granted';
+    document.getElementById('notif-status-box').className = `notif-status ${granted?'on':'off'}`;
+    document.getElementById('notif-dot').className = `notif-dot ${granted?'on':'off'}`;
+    document.getElementById('notif-text').textContent = granted ? '🔔 백그라운드 알림 활성화됨' : '브라우저 알림 권한이 필요해요';
+  }
+
+  // ── Schedule ──────────────────────────────────────────
+  function addSchedule() {
+    const t = document.getElementById('alarm-time').value;
+    if (!t) return;
+    if (schedules.includes(t)) return setStatus('notif-status-msg','이미 추가된 시간이에요','error');
+    schedules.push(t); schedules.sort();
+    localStorage.setItem('owm_schedules', JSON.stringify(schedules));
+    renderSchedules();
+    if (Notification.permission === 'granted') syncSchedulesToSW();
+    setStatus('notif-status-msg', `✅ 매일 ${t} 백그라운드 알림 등록됨`, 'success');
+  }
+  function removeSchedule(t) {
+    schedules = schedules.filter(x => x !== t);
+    localStorage.setItem('owm_schedules', JSON.stringify(schedules));
+    renderSchedules();
+    if (Notification.permission === 'granted') syncSchedulesToSW();
+  }
+  function renderSchedules() {
+    const el = document.getElementById('schedule-list');
+    if (!schedules.length) { el.innerHTML = '<div style="color:#9ab;font-size:0.85rem;padding:8px 0">아직 설정된 알림이 없어요</div>'; return; }
+    el.innerHTML = schedules.map(t => `
+      <div class="schedule-item">
+        <span>⏰ 매일 <strong>${t}</strong> 날씨 알림</span>
+        <button class="del-btn" onclick="removeSchedule('${t}')">🗑</button>
+      </div>`).join('');
+  }
+
+  function setStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    el.textContent = msg; el.className = `status-msg ${type}`;
+  }
+</script>
+</body>
+</html>
